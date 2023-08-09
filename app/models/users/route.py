@@ -1,50 +1,28 @@
+
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Header
 from typing import List, Optional, Dict
 from bson import ObjectId
 from app.models.users.user import User
 from app.database import get_database_atlas
-
-class HostDatabaseManager:
-    def __init__(self, host_config_path: str, atlas_uri: str, collection_name: str):
-        self.host_config_path = host_config_path
-        self.atlas_uri = atlas_uri
-        self.collection_name = collection_name
-        self.host_config = self.load_host_config()
-
-    def load_host_config(self) -> Dict[str, str]:
-        with open(self.host_config_path) as f:
-            host_config = json.load(f)
-        return host_config
-
-    def get_database_name(self, host: str) -> Optional[str]:
-        host_config_entry = self.host_config.get(host)
-        if host_config_entry:
-            return host_config_entry.get("databasename")
-        return None
-
-    def get_collection(self, host: str):
-        database_name = self.get_database_name(host)
-        if database_name:
-            return get_database_atlas(database_name, self.atlas_uri)[self.collection_name]
-        raise HTTPException(status_code=404, detail="Database not found for the host")
+from app.models.hosts.route import HostDatabaseManager
 
 router = APIRouter()
-password = "xxxxxx"
+
 atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
 collection_name = "users"
 
+database_manager = HostDatabaseManager(collection_name)
 
-current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-host_config_path = os.path.join(current_dir, "hostname.json")
-
-
-database_manager = HostDatabaseManager(host_config_path, atlas_uri, collection_name)
 
 @router.post("/", response_model=User)
-def create_user(request: Request, user_data: User):
-    host = request.headers.get("host")
+def create_user(
+    request: Request,
+    user_data: User,
+    htoken: Optional[str] = Header(None)
+):
+    host = htoken
     collection = database_manager.get_collection(host)
 
     user_data_dict = user_data.dict()
@@ -57,8 +35,11 @@ def create_user(request: Request, user_data: User):
         raise HTTPException(status_code=500, detail="Failed to create user")
 
 @router.get("/", response_model=List[User])
-def get_all_users(request: Request):
-    host = request.headers.get("host")
+def get_all_users(
+    request: Request,
+    htoken: Optional[str] = Header(None)
+):
+    host = htoken
     collection = database_manager.get_collection(host)
 
     users = []
@@ -67,8 +48,12 @@ def get_all_users(request: Request):
     return users
 
 @router.get("/{user_id}", response_model=User)
-def get_user(request: Request, user_id: str):
-    host = request.headers.get("host")
+def get_user(
+    request: Request,
+    user_id: str,
+    htoken: Optional[str] = Header(None)
+):
+    host = htoken
     collection = database_manager.get_collection(host)
 
     user = collection.find_one({"_id": user_id})
@@ -78,40 +63,33 @@ def get_user(request: Request, user_id: str):
         raise HTTPException(status_code=404, detail="User not found")
 
 @router.get("/filters/", response_model=List[User])
-async def get_users_by_filter(
+async def get_user_by_filter(
     request: Request,
-    name: Optional[str] = None,
-    email: Optional[str] = None,
     offset: int = 0,
     limit: int = 100,
-):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
-
+    htoken: Optional[str] = Header(None)
+) -> List[User]:
+    filter_params = await request.json()
     query = {}
-    if name:
-        query["name"] = name
-    if email:
-        query["email"] = email
 
+    for field, value in filter_params.items():
+        query[field] = value
+    host = htoken
+    collection = database_manager.get_collection(host)
+    cursor = collection.find(query).skip(offset).limit(limit)
     users = []
-    for user in collection.find(query).skip(offset).limit(limit):
+    async for user in cursor:
         users.append(User(id=str(user["_id"]), **user))
     return users
 
-@router.get("/filter", response_model=List[User])
-def get_users_by_filter(request: Request, filter: Dict):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
-
-    users = []
-    for user in collection.find(filter):
-        users.append(User(**user))
-    return users
-
 @router.put("/{user_id}", response_model=User)
-def update_user(request: Request, user_id: str, user_data):
-    host = request.headers.get("host")
+def update_user(
+    request: Request,
+    user_id: str,
+    user_data,
+    htoken: Optional[str] = Header(None)
+):
+    host = htoken
     collection = database_manager.get_collection(host)
 
     result = collection.update_one({"_id": user_id}, {"$set": user_data.dict()})
@@ -122,8 +100,12 @@ def update_user(request: Request, user_id: str, user_data):
         raise HTTPException(status_code=404, detail="User not found")
 
 @router.delete("/{user_id}")
-def delete_user(request: Request, user_id: str):
-    host = request.headers.get("host")
+def delete_user(
+    request: Request,
+    user_id: str,
+    htoken: Optional[str] = Header(None)
+):
+    host = htoken
     collection = database_manager.get_collection(host)
 
     result = collection.delete_one({"_id": user_id})

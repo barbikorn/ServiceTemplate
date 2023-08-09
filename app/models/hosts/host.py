@@ -1,11 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class User(BaseModel):
-    id : Optional[str]
+class Host(BaseModel):
+    token: str
     name: str
-    email: str
-    password: str
-    age: int
-    address: Optional[str] = None
-    
+    databasename: str

@@ -1,27 +1,20 @@
-import json
-import os
-from fastapi import APIRouter, HTTPException, Request
-from typing import List, Optional, Dict
-from bson import ObjectId
-from app.models.users.user import User
+from typing import Dict, Optional, List
 from app.database import get_database_atlas
+from fastapi import HTTPException, APIRouter, Depends , Request
+from pydantic import BaseModel
+from bson import ObjectId
+
+from app.models.hosts.host import Host
 
 class HostDatabaseManager:
-    def __init__(self, host_config_path: str, atlas_uri: str, collection_name: str):
-        self.host_config_path = host_config_path
-        self.atlas_uri = atlas_uri
+    def __init__(self,collection_name: str):
+        self.atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
         self.collection_name = collection_name
-        self.host_config = self.load_host_config()
-
-    def load_host_config(self) -> Dict[str, str]:
-        with open(self.host_config_path) as f:
-            host_config = json.load(f)
-        return host_config
 
     def get_database_name(self, host: str) -> Optional[str]:
-        host_config_entry = self.host_config.get(host)
-        if host_config_entry:
-            return host_config_entry.get("databasename")
+        host_entry = collection.find_one({"token": host})
+        if host_entry:
+            return host_entry["databasename"]
         return None
 
     def get_collection(self, host: str):
@@ -31,103 +24,70 @@ class HostDatabaseManager:
         raise HTTPException(status_code=404, detail="Database not found for the host")
 
 router = APIRouter()
-password = "xxxxxx"
+collection_name = "hosts"
 atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
-collection_name = "users"
+collection = get_database_atlas("hosts", atlas_uri)[collection_name]
 
+host_db_manager = HostDatabaseManager(collection_name)
 
-current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-host_config_path = os.path.join(current_dir, "hostname.json")
-
-
-database_manager = HostDatabaseManager(host_config_path, atlas_uri, collection_name)
-
-@router.post("/", response_model=User)
-def create_user(request: Request, user_data: User):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
-
-    user_data_dict = user_data.dict()
-    result = collection.insert_one(user_data_dict)
+@router.post("/", response_model=Host,include_in_schema=False)
+def create_host(host_data: Host):
+    host_data_dict = host_data.dict()
+    result = collection.insert_one(host_data_dict)
 
     if result.acknowledged:
-        created_user = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return User(**created_user)
+        created_host = collection.find_one({"_id": ObjectId(result.inserted_id)})
+        return Host(id=str(created_host["_id"]), **created_host)
     else:
-        raise HTTPException(status_code=500, detail="Failed to create user")
+        raise HTTPException(status_code=500, detail="Failed to create host")
 
-@router.get("/", response_model=List[User])
-def get_all_users(request: Request):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
+@router.get("/", response_model=List[Host],include_in_schema=False)
+def get_all_hosts():
+    hosts = []
+    for host in collection.find():
+        hosts.append(Host(id=str(host["_id"]), **host))
+    return hosts
 
-    users = []
-    for user in collection.find():
-        users.append(User(**user))
-    return users
-
-@router.get("/{user_id}", response_model=User)
-def get_user(request: Request, user_id: str):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
-
-    user = collection.find_one({"_id": user_id})
-    if user:
-        return User(**user)
+@router.get("/{host_id}", response_model=Host,include_in_schema=False)
+def get_host(host_id: str):
+    host = collection.find_one({"_id": ObjectId(host_id)})
+    if host:
+        return Host(id=str(host["_id"]), **host)
     else:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Host not found")
 
-@router.get("/filters/", response_model=List[User])
-async def get_users_by_filter(
+@router.get("/filters/", response_model=List[Host])
+async def get_host_by_filter(
     request: Request,
-    name: Optional[str] = None,
-    email: Optional[str] = None,
     offset: int = 0,
-    limit: int = 100,
-):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
-
+    limit: int = 100
+) -> List[Host]:
+    filter_params = await request.json()
     query = {}
-    if name:
-        query["name"] = name
-    if email:
-        query["email"] = email
 
-    users = []
-    for user in collection.find(query).skip(offset).limit(limit):
-        users.append(User(id=str(user["_id"]), **user))
-    return users
+    for field, value in filter_params.items():
+        query[field] = value
 
-@router.get("/filter", response_model=List[User])
-def get_users_by_filter(request: Request, filter: Dict):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
+    cursor = collection.find(query).skip(offset).limit(limit)
+    hosts = []
+    async for host in cursor:
+        hosts.append(Host(id=str(host["_id"]), **host))
+    return hosts
 
-    users = []
-    for user in collection.find(filter):
-        users.append(User(**user))
-    return users
-
-@router.put("/{user_id}", response_model=User)
-def update_user(request: Request, user_id: str, user_data):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
-
-    result = collection.update_one({"_id": user_id}, {"$set": user_data.dict()})
+@router.put("/{host_id}", response_model=Host,include_in_schema=False)
+def update_host(host_id: str, host_data: Host):
+    result = collection.update_one({"_id": ObjectId(host_id)}, {"$set": host_data.dict()})
     if result.modified_count == 1:
-        updated_user = collection.find_one({"_id": user_id})
-        return User(**updated_user)
+        updated_host = collection.find_one({"_id": ObjectId(host_id)})
+        return Host(id=str(updated_host["_id"]), **updated_host)
     else:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Host not found")
 
-@router.delete("/{user_id}")
-def delete_user(request: Request, user_id: str):
-    host = request.headers.get("host")
-    collection = database_manager.get_collection(host)
-
-    result = collection.delete_one({"_id": user_id})
+@router.delete("/{host_id}",include_in_schema=False)
+def delete_host(host_id: str):
+    result = collection.delete_one({"_id": ObjectId(host_id)})
     if result.deleted_count == 1:
-        return {"message": "User deleted successfully"}
+        return {"message": "Host deleted successfully"}
     else:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Host not found")
+
