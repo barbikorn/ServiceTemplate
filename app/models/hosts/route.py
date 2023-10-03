@@ -1,34 +1,20 @@
 from typing import Dict, Optional, List
 from app.database import get_database_atlas
-from fastapi import HTTPException, APIRouter, Depends , Request
+from fastapi import HTTPException, APIRouter, Depends , Request, Query
+from pymongo.collection import Collection
 from pydantic import BaseModel
 from bson import ObjectId
 
 from app.models.hosts.host import Host
 
-class HostDatabaseManager:
-    def __init__(self,collection_name: str):
-        self.atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
-        self.collection_name = collection_name
-
-    def get_database_name(self, host: str) -> Optional[str]:
-        host_entry = collection.find_one({"token": host})
-        if host_entry:
-            return host_entry["databasename"]
-        return None
-
-    def get_collection(self, host: str):
-        database_name = self.get_database_name(host)
-        if database_name:
-            return get_database_atlas(database_name, self.atlas_uri)[self.collection_name]
-        raise HTTPException(status_code=404, detail="Database not found for the host")
 
 router = APIRouter()
 collection_name = "hosts"
 atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
 collection = get_database_atlas("hosts", atlas_uri)[collection_name]
 
-host_db_manager = HostDatabaseManager(collection_name)
+# host_db_manager = HostDatabaseManager(collection_name)
+
 
 @router.post("/", response_model=Host,include_in_schema=False)
 def create_host(host_data: Host):
@@ -41,14 +27,14 @@ def create_host(host_data: Host):
     else:
         raise HTTPException(status_code=500, detail="Failed to create host")
 
-@router.get("/", response_model=List[Host],include_in_schema=False)
+@router.get("/", response_model=List[Host],include_in_schema=True)
 def get_all_hosts():
     hosts = []
     for host in collection.find():
         hosts.append(Host(id=str(host["_id"]), **host))
     return hosts
 
-@router.get("/{host_id}", response_model=Host,include_in_schema=False)
+@router.get("/{host_id}", response_model=Host,include_in_schema=True)
 def get_host(host_id: str):
     host = collection.find_one({"_id": ObjectId(host_id)})
     if host:
@@ -90,4 +76,5 @@ def delete_host(host_id: str):
         return {"message": "Host deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="Host not found")
+
 

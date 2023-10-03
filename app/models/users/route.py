@@ -1,25 +1,61 @@
 
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request, Header
-from typing import List, Optional, Dict
+from fastapi import APIRouter, HTTPException, Request, Header, Query
+from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.users.user import User
+from app.models.users.user import User,UserGet,UserCreate
 from app.database import get_database_atlas
-from app.models.hosts.route import HostDatabaseManager
+from lib.host_manager import HostDatabaseManager
 
 router = APIRouter()
 
-atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
 collection_name = "users"
-
 database_manager = HostDatabaseManager(collection_name)
 
 
-@router.post("/", response_model=User)
+from fastapi import FastAPI, Header, HTTPException
+from pymongo.collection import Collection
+from bson import ObjectId
+
+app = FastAPI()
+
+# Assuming you have a database_manager instance
+
+
+
+
+
+# @router.get("/search_look/")
+# async def search(query: str, aggregation: Optional[List[dict]] = None):
+#     try:
+#         aggregation_pipeline = [
+#             {"$match": {"$text": {"$search": query}}},
+#             # Perform a $lookup to join data from the authors collection
+#             {"$lookup": {
+#                 "from": "authors",
+#                 "localField": "author_id",
+#                 "foreignField": "_id",
+#                 "as": "author_info"
+#             }},
+#             # Add any additional aggregation stages
+#         ]
+        
+#         if aggregation:
+#             aggregation_pipeline.extend(aggregation)
+
+#         # Perform the search query
+#         search_result = list(books_collection.aggregate(aggregation_pipeline))
+
+#         return search_result
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/", response_model=UserGet)
 def create_user(
     request: Request,
-    user_data: User,
+    user_data: UserCreate,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
@@ -34,17 +70,19 @@ def create_user(
     else:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
-@router.get("/", response_model=List[User])
+
+@router.get("/", response_model=List[Dict[str, Any]])
 def get_all_users(
     request: Request,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
     collection = database_manager.get_collection(host)
-
     users = []
     for user in collection.find():
-        users.append(User(**user))
+        user_id = str(user.pop('_id'))
+        user["id"] = user_id
+        users.append(UserGet(**user))
     return users
 
 @router.get("/{user_id}", response_model=User)
@@ -113,3 +151,6 @@ def delete_user(
         return {"message": "User deleted successfully"}
     else:
         raise HTTPException(status_code=404, detail="User not found")
+
+
+

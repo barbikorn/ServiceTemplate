@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Request, Depends, status
+from fastapi import FastAPI, HTTPException, Request, Depends, status, Header
 from typing import List, Optional, Dict ,Any, Union
 from bson import ObjectId
 from app.models.users.user import User,UserUpdate,UserCreate, Token, TokenData
-from app.models.hosts.route import HostDatabaseManager
+from lib.host_manager import HostDatabaseManager
 from app.database import get_database_atlas
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -15,7 +15,30 @@ from fastapi.openapi.utils import get_openapi
 
 from app.models.users.route import router as users_router
 from app.models.timers.route import router as timers_router
+from app.models.bills.route import router as bills_router
+from app.models.certifications.route import router as certifications_router
+from app.models.contents.route import router as contents_routers
+from app.models.courses.route import router as courses_router
+from app.models.documents.route import router as documents_router
+from app.models.enrolls.route import router as enrolls_router
+from app.models.exams.route import router as exams_router
+from app.models.forms.route import router as forms_router
 from app.models.hosts.route import router as hosts_router
+from app.models.mcourses.route import router as mcourses_router
+from app.models.players.route import router as players_router
+from app.models.posts.route import router as posts_router
+from app.models.progresses.route import router as progresses_router
+from app.models.questions.route import router as questions_router
+from app.models.queues.route import router as queues_router
+from app.models.schools.route import router as schools_router
+from app.models.scores.route import router as scores_router
+from app.models.storages.route import router as storages_router
+from app.models.templates.route import router as templates_router
+from app.models.transactions.route import router as transactions_router
+
+
+
+
 # from app.models.items.route import router as items_router
 # from app.models.shops.route import router as shops_router
 print("print from main")
@@ -23,11 +46,67 @@ print("print from main")
 app = FastAPI()
 
 app.include_router(users_router, prefix="/users", tags=["users"])
-app.include_router(timers_router, prefix="/timers", tags=["timers"])
+# app.include_router(timers_router, prefix="/timers", tags=["timers"])
+app.include_router(bills_router, prefix="/bills", tags=["bills"])
+app.include_router(certifications_router, prefix="/certifications", tags=["certifications"])
+app.include_router(contents_routers, prefix="/contents", tags=["contents"])
+app.include_router(courses_router, prefix="/courses", tags=["courses"])
+app.include_router(documents_router, prefix="/documents", tags=["documents"])
+app.include_router(enrolls_router, prefix="/enrolls", tags=["enrolls"])
+app.include_router(exams_router, prefix="/exams", tags=["exams"])
+app.include_router(forms_router, prefix="/forms", tags=["forms"])
 app.include_router(hosts_router, prefix="/hosts", tags=["hosts"])
+app.include_router(mcourses_router, prefix="/mcourses", tags=["mcourses"])
+app.include_router(players_router, prefix="/players", tags=["players"])
+app.include_router(posts_router, prefix="/posts", tags=["posts"])
+app.include_router(progresses_router, prefix="/progresses", tags=["progresses"])
+app.include_router(questions_router, prefix="/questions", tags=["questions"])
+app.include_router(queues_router, prefix="/queues", tags=["queues"])
+app.include_router(schools_router, prefix="/schools", tags=["schools"])
+app.include_router(scores_router, prefix="/scores", tags=["scores"])
+app.include_router(storages_router, prefix="/storages", tags=["storages"])
+app.include_router(templates_router, prefix="/templates", tags=["templates"])
+app.include_router(transactions_router, prefix="/transactions", tags=["transactions"])
+app.include_router(scores_router, prefix="/scores", tags=["scores"])
+app.include_router(scores_router, prefix="/scores", tags=["scores"])
+
+
 # app.include_router(items_router, prefix="/items", tags=["items"])
 # app.include_router(shops_router, prefix="/shops", tags=["shops"])
 
+
+# ---------- My autherize Swagger ----------
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
+from fastapi.openapi.models import OAuthFlowAuthorizationCode as OAuthFlowAuthorizationCodeModel
+from fastapi.openapi.models import OAuthFlowPassword as OAuthFlowPasswordModel
+from fastapi.openapi.models import OAuthFlowImplicit as OAuthFlowImplicitModel
+from fastapi.openapi.models import OAuthFlowClientCredentials as OAuthFlowClientCredentialsModel
+from fastapi.openapi.models import OAuthFlowAuthorizationCode as OAuthFlowAuthorizationCodeModel
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
+from fastapi.openapi.models import OAuthFlowPassword as OAuthFlowPasswordModel
+from fastapi.openapi.models import OAuthFlowAuthorizationCode as OAuthFlowAuthorizationCodeModel
+
+# # Define your OAuth2 flows
+# oauth_flows = OAuthFlowsModel(
+#     password=OAuthFlowPasswordModel(tokenUrl="/token"),
+#     authorizationCode=OAuthFlowAuthorizationCodeModel(
+#         authorizationUrl="/auth", tokenUrl="/token"
+#     ),
+#     clientCredentials=OAuthFlowClientCredentialsModel(tokenUrl="/token"),
+#     implicit=OAuthFlowImplicitModel(authorizationUrl="/auth"),
+# )
+
+# # Add the OAuth2 security scheme
+# security_schemes = {
+#     "OAuth2PasswordBearer": {
+#         "type": "oauth2",
+#         "flows": oauth_flows,
+#     }
+# }
+
+# app.openapi = {"security": [{"OAuth2PasswordBearer": []}], "info": {"title": "Your API"}}
+
+# ------------------- Auth System ----------------
 
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
@@ -45,8 +124,9 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def authenticate_user( username: str, password: str):
-    collection = get_database_atlas("WEIS", atlas_uri)["users"]
+def authenticate_user( username: str, password: str, htoken: str):
+    host = htoken
+    collection = database_manager.get_collection(host)
     user = collection.find_one({"username": username})
     if not user:
         return False
@@ -103,9 +183,10 @@ async def get_current_active_user(
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends()
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    htoken: Optional[str] = Header(None, description="HToken for additional authentication")
 ):
-    user = authenticate_user(form_data.username, form_data.password)
+    user = authenticate_user(form_data.username, form_data.password,htoken)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -114,15 +195,57 @@ async def login_for_access_token(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user['email']}, expires_delta=access_token_expires
+        data={"sub": user['username']}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
+# ------------------ API part ------------
+# Search
+
+@app.post("/{collection}/aggregate")
+async def aggregate_collection(
+    collection: str,
+    request_data: dict,
+    htoken: Optional[str] = Header(None)
+):
+    try:
+        pipeline = request_data.get("pipeline", [])
+
+        if not isinstance(pipeline, list):
+            raise HTTPException(status_code=400, detail="Invalid request format")
+
+        # Get the database name based on the host or token
+        database_name = database_manager.get_database_name(htoken)
+
+        if not database_name:
+            raise HTTPException(status_code=404, detail="Database not found for the host")
+
+        # Get the collection based on the collection name and database name
+        db_collection = database_manager.get_collection(htoken, collection)
+
+        # Apply additional modifications to the pipeline as needed
+        modified_pipeline = []
+        for stage in pipeline:
+            if "$match" in stage and "_id" in stage["$match"]:
+                stage["$match"]["_id"] = ObjectId(stage["$match"]["_id"])
+            modified_pipeline.append(stage)
+
+        result = list(db_collection.aggregate(modified_pipeline))
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.post("/register", response_model=User)
-async def register_user(user_data: UserCreate):
+async def register_user(
+    user_data: UserCreate ,
+    htoken: Optional[str] = Header(None)
+    ):
+
+    host = htoken
+    collection = database_manager.get_collection(host)
     user_data_dict = user_data.dict()
     user_data_dict["password"] = get_password_hash(user_data_dict["password"])
-    collection = get_database_atlas("WEIS", atlas_uri)["users"]
     result = collection.insert_one(user_data_dict)
      
     if result.acknowledged:
@@ -137,9 +260,6 @@ async def read_users_me(
     current_user: Annotated[User, Depends(get_current_active_user)]
 ):
     return current_user
-
-
-
 
 
 # Run the app

@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, Union
+from bson import ObjectId
 
 
 class User(BaseModel):
@@ -22,6 +23,16 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    name: Optional[str]
+    username : Optional[str]
+    email: Optional[str]
+    password: Optional[str]
+    role: Optional[str]
+    age: Optional[int]
+    address: Optional[str] 
+
+class UserGet(BaseModel):
+    id:Optional[str]
     name: Optional[str]
     username : Optional[str]
     email: Optional[str]

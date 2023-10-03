@@ -14,3 +14,4 @@ starlette==0.27.0
 typing-extensions==4.6.2
 uvicorn==0.22.0
 passlib==1.7.4
+swagger-ui-bundle==0.0.9
