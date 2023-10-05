@@ -36,7 +36,6 @@ def create_school(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_schools(
-    school_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

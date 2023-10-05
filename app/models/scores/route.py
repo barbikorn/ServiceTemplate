@@ -34,7 +34,6 @@ def create_score(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_scores(
-    score_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

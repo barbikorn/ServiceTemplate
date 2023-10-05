@@ -36,7 +36,6 @@ def create_player(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_players(
-    player_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

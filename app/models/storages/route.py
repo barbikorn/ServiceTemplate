@@ -34,7 +34,6 @@ def create_storage(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_storages(
-    storage_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

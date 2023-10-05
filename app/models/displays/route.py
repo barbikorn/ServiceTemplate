@@ -36,7 +36,6 @@ def create_display(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_displays(
-    display_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

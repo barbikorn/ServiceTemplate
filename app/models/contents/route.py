@@ -37,7 +37,6 @@ def create_content(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_contents(
-    content_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

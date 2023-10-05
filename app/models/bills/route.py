@@ -34,7 +34,6 @@ def create_bill(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_bills(
-    bill_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

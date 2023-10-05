@@ -34,7 +34,6 @@ def create_template(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_templates(
-    template_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken

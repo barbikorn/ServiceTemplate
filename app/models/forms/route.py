@@ -37,7 +37,6 @@ def create_form(
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_forms(
-    form_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
