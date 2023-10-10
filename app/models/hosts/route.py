@@ -10,7 +10,7 @@ from app.models.hosts.host import Host
 
 router = APIRouter()
 collection_name = "hosts"
-atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
+atlas_uri = "mongodb+srv://doadmin:k2R0165xp4G8iV3E@host-manager-a6c7287d.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
 collection = get_database_atlas("hosts", atlas_uri)[collection_name]
 
 # host_db_manager = HostDatabaseManager(collection_name)

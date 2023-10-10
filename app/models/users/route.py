@@ -23,9 +23,6 @@ app = FastAPI()
 # Assuming you have a database_manager instance
 
 
-
-
-
 # @router.get("/search_look/")
 # async def search(query: str, aggregation: Optional[List[dict]] = None):
 #     try:
