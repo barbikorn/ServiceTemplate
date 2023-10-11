@@ -4,18 +4,16 @@ from typing import Dict, Optional
 from app.database import get_database_atlas
 from fastapi import HTTPException
 
-from typing import Dict, Optional
-from app.database import get_database_atlas
-
 class HostDatabaseManager:
     def __init__(self, collection_name: str):
         self.host_uri = "mongodb+srv://doadmin:k2R0165xp4G8iV3E@host-manager-a6c7287d.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
-        self.atlas_uri = "mongodb+srv://doadmin:AU97Jfe026gE415o@db-mongodb-kornxecobz-8ade0110.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
+        self.atlas_uri = "mongodb+srv://doadmin:Z79MQ4mxi5X0281G@academy-client-a3614ad3.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
         self.collection_name = collection_name
         self.host_collection = get_database_atlas("hosts", self.host_uri)["hosts"]
 
     def get_database_name(self, host: str) -> Optional[str]:
         host_entry = self.host_collection.find_one({"token": host})
+        print(host_entry)
         if host_entry:
             return host_entry["databasename"]
         return None
