@@ -14,7 +14,6 @@ from fastapi.openapi.utils import get_openapi
 
 
 from app.models.users.route import router as users_router
-from app.models.timers.route import router as timers_router
 from app.models.bills.route import router as bills_router
 from app.models.certifications.route import router as certifications_router
 from app.models.contents.route import router as contents_routers
@@ -46,7 +45,6 @@ print("print from main")
 app = FastAPI()
 
 app.include_router(users_router, prefix="/users", tags=["users"])
-# app.include_router(timers_router, prefix="/timers", tags=["timers"])
 app.include_router(bills_router, prefix="/bills", tags=["bills"])
 app.include_router(certifications_router, prefix="/certifications", tags=["certifications"])
 app.include_router(contents_routers, prefix="/contents", tags=["contents"])
