@@ -27,7 +27,8 @@ def create_progress(
 
     if result.acknowledged:
         created_progress = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Progress(**created_progress)
+        created_progress['id'] = str(created_progress['_id'])  # Add 'id' key and convert ObjectId to string
+        return ProgressGet(**created_progress)
     else:
         raise HTTPException(status_code=500, detail="Failed to create progress")
 

@@ -18,22 +18,23 @@ database_manager = HostDatabaseManager(collection_name)
 
 
 @router.post("/", response_model=FormGet)
-def create_form(
+def create_user(
     request: Request,
-    form_data: FormCreate,
+    user_data: FormCreate,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
     collection = database_manager.get_collection(host)
 
-    form_data_dict = form_data.dict()
-    result = collection.insert_one(form_data_dict)
+    user_data_dict = user_data.dict()
+    result = collection.insert_one(user_data_dict)
 
     if result.acknowledged:
-        created_form = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Form(**created_form)
+        created_user = collection.find_one({"_id": ObjectId(result.inserted_id)})
+        created_user['id'] = str(created_user['_id'])  # Add 'id' key and convert ObjectId to string
+        return FormGet(**created_user)
     else:
-        raise HTTPException(status_code=500, detail="Failed to create form")
+        raise HTTPException(status_code=500, detail="Failed to create user")
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_forms(

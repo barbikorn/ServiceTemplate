@@ -30,7 +30,8 @@ def create_question(
 
     if result.acknowledged:
         created_question = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Question(**created_question)
+        created_question['id'] = str(created_question['_id'])  # Add 'id' key and convert ObjectId to string
+        return QuestionGet(**created_question)
     else:
         raise HTTPException(status_code=500, detail="Failed to create question")
 

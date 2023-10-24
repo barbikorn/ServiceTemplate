@@ -18,22 +18,23 @@ database_manager = HostDatabaseManager(collection_name)
 
 
 @router.post("/", response_model=PostGet)
-def create_exam(
+def create_post(
     request: Request,
-    exam_data: PostCreate,
+    post_data: PostCreate,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
     collection = database_manager.get_collection(host)
 
-    exam_data_dict = exam_data.dict()
-    result = collection.insert_one(exam_data_dict)
+    post_data_dict = post_data.dict()
+    result = collection.insert_one(post_data_dict)
 
     if result.acknowledged:
-        created_exam = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Post(**created_exam)
+        created_post = collection.find_one({"_id": ObjectId(result.inserted_id)})
+        created_post['id'] = str(created_post['_id'])  # Add 'id' key and convert ObjectId to string
+        return PostGet(**created_post)
     else:
-        raise HTTPException(status_code=500, detail="Failed to create exam")
+        raise HTTPException(status_code=500, detail="Failed to create post")
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_exams(

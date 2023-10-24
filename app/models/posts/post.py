@@ -10,11 +10,11 @@ class PostCreate(BaseModel):
     post_ids : Optional[List[str]]
     description: Optional[str]
 
-
 class PostUpdate(BaseModel):
     post_ids : Optional[List[str]]
     description: Optional[str]
 
 class PostGet(BaseModel):
+    id: str
     post_ids : Optional[List[str]]
     description: Optional[str]

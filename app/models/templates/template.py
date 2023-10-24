@@ -17,6 +17,7 @@ class TemplateUpdate(BaseModel):
     score: Optional[int]
 
 class TemplateGet(BaseModel):
+    id : str
     user_id: Optional[str]
     course_id : Optional[str]
     score: Optional[int]

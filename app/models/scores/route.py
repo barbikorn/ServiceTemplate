@@ -28,7 +28,8 @@ def create_score(
 
     if result.acknowledged:
         created_score = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Score(**created_score)
+        created_score['id'] = str(created_score['_id'])  # Add 'id' key and convert ObjectId to string
+        return ScoreGet(**created_score)
     else:
         raise HTTPException(status_code=500, detail="Failed to create score")
 

@@ -28,7 +28,8 @@ def create_website(
 
     if result.acknowledged:
         created_website = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Website(**created_website)
+        created_website['id'] = str(created_website['_id'])  # Add 'id' key and convert ObjectId to string
+        return WebsiteGet(**created_website)
     else:
         raise HTTPException(status_code=500, detail="Failed to create website")
 

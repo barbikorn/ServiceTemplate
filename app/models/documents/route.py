@@ -31,7 +31,8 @@ def create_document(
 
     if result.acknowledged:
         created_document = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Document(**created_document)
+        created_document['id'] = str(created_document['_id'])  # Add 'id' key and convert ObjectId to string
+        return DocumentGet(**created_document)
     else:
         raise HTTPException(status_code=500, detail="Failed to create document")
 

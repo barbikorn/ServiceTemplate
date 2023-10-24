@@ -15,5 +15,6 @@ class ExamUpdate(BaseModel):
     course_id : Optional[str]
 
 class ExamGet(BaseModel):
+    id : str
     exam_name: Optional[str]
     course_id : Optional[str]

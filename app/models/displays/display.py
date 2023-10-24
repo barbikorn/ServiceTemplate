@@ -19,5 +19,7 @@ class DisplayUpdate(BaseModel):
     description: Optional[str]
 
 class DisplayGet(BaseModel):
+    school_id : str
+    description: Optional[str]
     coursename : Optional[str]
     school_id : Optional[str]

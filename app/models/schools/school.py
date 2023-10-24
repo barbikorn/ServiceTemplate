@@ -19,6 +19,7 @@ class SchoolUpdate(BaseModel):
     address: Optional[str] 
 
 class SchoolGet(BaseModel):
+    id : str
     schoolname : Optional[str]
     tel: Optional[str]
     address: Optional[str] 

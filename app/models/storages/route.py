@@ -28,7 +28,8 @@ def create_storage(
 
     if result.acknowledged:
         created_storage = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Storage(**created_storage)
+        created_storage['id'] = str(created_storage['_id'])  # Add 'id' key and convert ObjectId to string
+        return StorageGet(**created_storage)
     else:
         raise HTTPException(status_code=500, detail="Failed to create storage")
 

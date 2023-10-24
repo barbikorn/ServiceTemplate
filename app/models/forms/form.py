@@ -16,6 +16,7 @@ class FormUpdate(BaseModel):
     description: Optional[str] 
 
 class FormGet(BaseModel):
+    id : str
     course_id: Optional[str]
     description: Optional[str] 
     

@@ -3,41 +3,27 @@ from typing import Optional, Union
 
 
 class Player(BaseModel):
-    name: str
-    schoolname : str
-    email: str
-    password: str
-    role: str
-    age: int
-    address: Optional[str] 
+    exam_id: str
+    course_id: str
+    name : str
 
 class PlayerCreate(BaseModel):
+    exam_id: str
+    course_id : str
     name: str
-    schoolname : str
-    email: str
-    password: str
-    role: Optional[str] = "..."
-    age: Optional[int] = 0
-    address: Optional[str] 
 
 
 class PlayerUpdate(BaseModel):
+    exam_id: Optional[str]
+    course_id : Optional[str]
     name: Optional[str]
-    schoolname : Optional[str]
-    email: Optional[str]
-    password: Optional[str]
-    role: Optional[str]
-    age: Optional[int]
-    address: Optional[str] 
+
 
 class PlayerGet(BaseModel):
+    id:str
+    exam_id: Optional[str]
+    course_id : Optional[str]
     name: Optional[str]
-    schoolname : Optional[str]
-    email: Optional[str]
-    password: Optional[str]
-    role: Optional[str]
-    age: Optional[int]
-    address: Optional[str] 
 
 
 class Token(BaseModel):

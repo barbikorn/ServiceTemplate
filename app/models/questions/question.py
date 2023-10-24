@@ -18,6 +18,7 @@ class QuestionUpdate(BaseModel):
     exam_id: Optional[str]
 
 class QuestionGet(BaseModel):
+    id : str
     name: Optional[str] 
     question : Optional[str] 
     exam_id: Optional[str]

@@ -28,7 +28,8 @@ def create_template(
 
     if result.acknowledged:
         created_template = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Template(**created_template)
+        created_template['id'] = str(created_template['_id'])  # Add 'id' key and convert ObjectId to string
+        return TemplateGet(**created_template)
     else:
         raise HTTPException(status_code=500, detail="Failed to create template")
 

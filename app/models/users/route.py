@@ -63,7 +63,8 @@ def create_user(
 
     if result.acknowledged:
         created_user = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return User(**created_user)
+        created_user['id'] = str(created_user['_id'])  # Add 'id' key and convert ObjectId to string
+        return UserGet(**created_user)
     else:
         raise HTTPException(status_code=500, detail="Failed to create user")
 

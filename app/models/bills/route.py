@@ -13,7 +13,6 @@ router = APIRouter()
 collection_name = "bills"
 database_manager = HostDatabaseManager(collection_name)
 
-# CRUD
 @router.post("/", response_model=BillGet)
 def create_bill(
     request: Request,
@@ -28,7 +27,8 @@ def create_bill(
 
     if result.acknowledged:
         created_bill = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Bill(**created_bill)
+        created_bill['id'] = str(created_bill['_id'])  # Add 'id' key and convert ObjectId to string
+        return BillGet(**created_bill)
     else:
         raise HTTPException(status_code=500, detail="Failed to create bill")
 

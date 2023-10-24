@@ -28,10 +28,10 @@ def create_type(
 
     if result.acknowledged:
         created_type = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Type(**created_type)
+        created_type['id'] = str(created_type['_id'])  # Add 'id' key and convert ObjectId to string
+        return TypeGet(**created_type)
     else:
         raise HTTPException(status_code=500, detail="Failed to create type")
-
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_types(
     htoken: Optional[str] = Header(None)

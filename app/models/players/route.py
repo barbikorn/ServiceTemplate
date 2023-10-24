@@ -30,7 +30,8 @@ def create_player(
 
     if result.acknowledged:
         created_player = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Player(**created_player)
+        created_player['id'] = str(created_player['_id'])  # Add 'id' key and convert ObjectId to string
+        return PlayerGet(**created_player)
     else:
         raise HTTPException(status_code=500, detail="Failed to create player")
 

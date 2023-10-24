@@ -30,7 +30,8 @@ def create_course(
 
     if result.acknowledged:
         created_course = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Course(**created_course)
+        created_course['id'] = str(created_course['_id'])  # Add 'id' key and convert ObjectId to string
+        return CourseGet(**created_course)
     else:
         raise HTTPException(status_code=500, detail="Failed to create course")
 

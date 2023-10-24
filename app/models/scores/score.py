@@ -17,6 +17,7 @@ class ScoreUpdate(BaseModel):
     score: Optional[int]
 
 class ScoreGet(BaseModel):
+    id : str
     user_id: Optional[str]
     course_id : Optional[str]
     score: Optional[int]

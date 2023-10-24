@@ -19,5 +19,7 @@ class ContentUpdate(BaseModel):
     description: Optional[Any]
 
 class ContentGet(BaseModel):
+    id:Optional[str]
     coursename : Optional[str]
     school_id : Optional[str]
+    description: Optional[Any]

@@ -28,7 +28,8 @@ def create_userForm(
 
     if result.acknowledged:
         created_userForm = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return UserForm(**created_userForm)
+        created_userForm['id'] = str(created_userForm['_id'])  # Add 'id' key and convert ObjectId to string
+        return UserFormGet(**created_userForm)
     else:
         raise HTTPException(status_code=500, detail="Failed to create userForm")
 

@@ -17,6 +17,7 @@ class TypeUpdate(BaseModel):
     score: Optional[int]
 
 class TypeGet(BaseModel):
+    id : str
     user_id: Optional[str]
     course_id : Optional[str]
     score: Optional[int]

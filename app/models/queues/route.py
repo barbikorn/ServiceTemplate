@@ -28,7 +28,8 @@ def create_queue(
 
     if result.acknowledged:
         created_queue = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Queue(**created_queue)
+        created_queue['id'] = str(created_queue['_id'])  # Add 'id' key and convert ObjectId to string
+        return QueueGet(**created_queue)
     else:
         raise HTTPException(status_code=500, detail="Failed to create queue")
 

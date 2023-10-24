@@ -31,7 +31,8 @@ def create_content(
 
     if result.acknowledged:
         created_content = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Content(**created_content)
+        created_content['id'] = str(created_content['_id'])  # Add 'id' key and convert ObjectId to string
+        return ContentGet(**created_content)
     else:
         raise HTTPException(status_code=500, detail="Failed to create content")
 

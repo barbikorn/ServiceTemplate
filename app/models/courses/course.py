@@ -13,12 +13,13 @@ class CourseCreate(BaseModel):
     coursename: Optional[str]
     description: Optional[str]
 
-
 class CourseUpdate(BaseModel):
     coursename : Optional[str]
     school_id : Optional[str]
     description: Optional[str]
 
 class CourseGet(BaseModel):
+    id:Optional[str]
     coursename : Optional[str]
     school_id : Optional[str]
+    description: Optional[str]

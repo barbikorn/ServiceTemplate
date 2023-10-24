@@ -31,6 +31,7 @@ class QueueUpdate(BaseModel):
     address: Optional[str] 
 
 class QueueGet(BaseModel):
+    id : str
     name: Optional[str]
     schoolname : Optional[str]
     email: Optional[str]

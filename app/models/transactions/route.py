@@ -28,7 +28,8 @@ def create_transaction(
 
     if result.acknowledged:
         created_transaction = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Transaction(**created_transaction)
+        created_transaction['id'] = str(created_transaction['_id'])  # Add 'id' key and convert ObjectId to string
+        return TransactionGet(**created_transaction)
     else:
         raise HTTPException(status_code=500, detail="Failed to create transaction")
 

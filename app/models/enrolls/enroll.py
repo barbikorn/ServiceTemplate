@@ -16,6 +16,7 @@ class EnrollUpdate(BaseModel):
     description: Optional[str] 
 
 class EnrollGet(BaseModel):
+    id : str
     course_id: Optional[str]
     description: Optional[str] 
     

@@ -30,7 +30,8 @@ def create_display(
 
     if result.acknowledged:
         created_display = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Display(**created_display)
+        created_display['id'] = str(created_display['_id'])  # Add 'id' key and convert ObjectId to string
+        return DisplayGet(**created_display)
     else:
         raise HTTPException(status_code=500, detail="Failed to create display")
 

@@ -19,6 +19,7 @@ class CertificationUpdate(BaseModel):
     course_id: Optional[str] 
 
 class CertificationGet(BaseModel):
+    id:Optional[str]
     name: Optional[str] 
     user_id:Optional[str] 
     course_id: Optional[str] 

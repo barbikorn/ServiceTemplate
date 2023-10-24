@@ -31,7 +31,8 @@ def create_enroll(
 
     if result.acknowledged:
         created_enroll = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Enroll(**created_enroll)
+        created_enroll['id'] = str(created_enroll['_id'])  # Add 'id' key and convert ObjectId to string
+        return EnrollGet(**created_enroll)
     else:
         raise HTTPException(status_code=500, detail="Failed to create enroll")
 

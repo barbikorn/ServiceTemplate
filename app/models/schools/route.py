@@ -30,7 +30,8 @@ def create_school(
 
     if result.acknowledged:
         created_school = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return School(**created_school)
+        created_school['id'] = str(created_school['_id'])  # Add 'id' key and convert ObjectId to string
+        return SchoolGet(**created_school)
     else:
         raise HTTPException(status_code=500, detail="Failed to create school")
 

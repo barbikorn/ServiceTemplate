@@ -19,5 +19,6 @@ class McourseUpdate(BaseModel):
     description: Optional[str]
 
 class McourseGet(BaseModel):
+    id:str
     coursename : Optional[str]
     school_id : Optional[str]

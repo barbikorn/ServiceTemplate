@@ -30,7 +30,8 @@ def create_mcourse(
 
     if result.acknowledged:
         created_mcourse = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Mcourse(**created_mcourse)
+        created_mcourse['id'] = str(created_mcourse['_id'])  # Add 'id' key and convert ObjectId to string
+        return McourseGet(**created_mcourse)
     else:
         raise HTTPException(status_code=500, detail="Failed to create mcourse")
 

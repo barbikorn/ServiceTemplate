@@ -27,7 +27,8 @@ def create_certification(
 
     if result.acknowledged:
         created_certification = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        return Certification(**created_certification)
+        created_certification['id'] = str(created_certification['_id'])  # Add 'id' key and convert ObjectId to string
+        return CertificationGet(**created_certification)
     else:
         raise HTTPException(status_code=500, detail="Failed to create certification")
 

@@ -16,6 +16,8 @@ class DocumentUpdate(BaseModel):
     description: Optional[str] 
 
 class DocumentGet(BaseModel):
+    id : str
     course_id: Optional[str]
     description: Optional[str] 
+
     
