@@ -13,6 +13,9 @@ from typing_extensions import Annotated
 from fastapi.openapi.utils import get_openapi
 
 
+# Apply the middleware
+# from lib.middleware.s3Log import log_request_and_upload_to_s3_middle
+
 from app.models.users.route import router as users_router
 from app.models.bills.route import router as bills_router
 from app.models.certifications.route import router as certifications_router
@@ -44,6 +47,10 @@ print("print from main")
 # mongol part
 app = FastAPI()
 
+
+# Apply the middleware
+
+
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(bills_router, prefix="/bills", tags=["bills"])
 app.include_router(certifications_router, prefix="/certifications", tags=["certifications"])
@@ -68,6 +75,7 @@ app.include_router(transactions_router, prefix="/transactions", tags=["transacti
 app.include_router(scores_router, prefix="/scores", tags=["scores"])
 app.include_router(scores_router, prefix="/scores", tags=["scores"])
 
+# app.middleware("http")(log_request_and_upload_to_s3_middle) 
 
 # app.include_router(items_router, prefix="/items", tags=["items"])
 # app.include_router(shops_router, prefix="/shops", tags=["shops"])

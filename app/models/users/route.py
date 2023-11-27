@@ -4,21 +4,23 @@ import os
 from fastapi import APIRouter, HTTPException, Request, Header, Query
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.users.user import User,UserGet,UserCreate
+from app.models.users.user import User,UserGet,UserCreate,UserUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
+# from lib.convert_request import request_to_dict
+from lib.middleware.queueLog import log_request_and_upload_to_queue
+
 
 router = APIRouter()
 
 collection_name = "users"
 database_manager = HostDatabaseManager(collection_name)
-
+# Use the middleware on the router
 
 from fastapi import FastAPI, Header, HTTPException
 from pymongo.collection import Collection
 from bson import ObjectId
 
-app = FastAPI()
 
 # Assuming you have a database_manager instance
 
@@ -50,20 +52,24 @@ app = FastAPI()
 #         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=UserGet)
-def create_user(
+async def create_user(
     request: Request,
     user_data: UserCreate,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
     collection = database_manager.get_collection(host)
 
     user_data_dict = user_data.dict()
     result = collection.insert_one(user_data_dict)
 
-    if result.acknowledged:
+
+    if result.acknowledged :
+
         created_user = collection.find_one({"_id": ObjectId(result.inserted_id)})
         created_user['id'] = str(created_user['_id'])  # Add 'id' key and convert ObjectId to string
+        response = await log_request_and_upload_to_queue(request,collection_name,created_user,htoken)
         return UserGet(**created_user)
     else:
         raise HTTPException(status_code=500, detail="Failed to create user")
@@ -118,20 +124,24 @@ async def get_user_by_filter(
         users.append(User(id=str(user["_id"]), **user))
     return users
 
-@router.put("/{user_id}", response_model=User)
+@router.put("/{user_id}", response_model=UserGet)
 def update_user(
     request: Request,
     user_id: str,
-    user_data,
+    user_data : UserUpdate ,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
     collection = database_manager.get_collection(host)
-
-    result = collection.update_one({"_id": user_id}, {"$set": user_data.dict()})
+    print(user_id)
+    print(user_data)
+    result = collection.update_one({"_id": ObjectId(user_id)}, {"$set": user_data.dict()})
+    #CAN use this timestamp
+    print(result.raw_result)
+    print(result.modified_count)
     if result.modified_count == 1:
-        updated_user = collection.find_one({"_id": user_id})
-        return User(**updated_user)
+        updated_user = collection.find_one({"_id": ObjectId(user_id)})
+        return UserGet(**updated_user)
     else:
         raise HTTPException(status_code=404, detail="User not found")
 

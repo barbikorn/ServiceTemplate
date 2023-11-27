@@ -7,7 +7,6 @@ class Course(BaseModel):
     coursename: str
     description : str
 
-
 class CourseCreate(BaseModel):
     school_id : Optional[str]
     coursename: Optional[str]
