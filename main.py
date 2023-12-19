@@ -268,6 +268,83 @@ async def read_users_me(
     return current_user
 
 
+
+
+
+
+# ------------------------ LINE ----------------------------------
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2AuthorizationCodeBearer
+from app.database import get_database_atlas, pwd_context  # Import necessary dependencies
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
+from fastapi.security import OAuth2AuthorizationCodeBearer
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
+from fastapi.openapi.models import OAuthFlowAuthorizationCode
+from lib.middleware.LINE import fetch_line_user_info
+
+
+app = FastAPI()
+
+# Define your OAuth2 flow for LINE Login
+line_oauth2_scheme = OAuth2AuthorizationCodeBearer(
+    authorizationUrl="LINE_LOGIN_AUTH_URL",
+    tokenUrl="LINE_TOKEN_URL",
+)
+
+# Callback endpoint for LINE Login
+@app.get("/login/line/callback")
+async def line_login_callback(
+    code: str, 
+    state: str,
+    htoken: Optional[str] = Header(None) ,
+    token: str = Depends(line_oauth2_scheme),
+):
+    try:
+        # Use the LINE code to fetch the user information from LINE
+        line_user_info = fetch_line_user_info(code)
+
+        # Extract necessary information from LINE user info
+        line_user_id = line_user_info.get("user_id")
+        line_user_email = line_user_info.get("email")
+        line_user_name = line_user_info.get("display_name")
+
+        # Perform user registration or login logic based on LINE user information
+        # Example: Check if the user is already registered in your system
+        host = htoken
+        collection = database_manager.get_collection(host)
+        existing_user = collection.find_one({"line_user_id": line_user_id})
+
+        if existing_user:
+            # User is already registered, perform login
+            user = authenticate_user(line_user_id, None, htoken=None)
+        else:
+            # User is not registered, perform registration
+            user_data = {
+                "username": line_user_name,
+                "email": line_user_email,
+                "line_user_id": line_user_id,
+                # Add other required fields
+            }
+            result = collection.insert_one(user_data)
+
+            if result.acknowledged:
+                user = collection.find_one({"_id": ObjectId(result.inserted_id)})
+            else:
+                raise HTTPException(status_code=500, detail="Failed to create user")
+
+        # Generate an access token for the user
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(data={"sub": user['username']}, expires_delta=access_token_expires)
+
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 # Run the app
 if __name__ == "__main__":
     import uvicorn

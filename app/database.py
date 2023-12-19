@@ -58,3 +58,7 @@ def get_database_pg(db_type: str, db_name: str, host: str, port: str, username: 
     else:
         print("Invalid database type")
         return None
+
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
