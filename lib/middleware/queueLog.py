@@ -2,7 +2,6 @@
 
 from fastapi import Request,BackgroundTasks
 import json
-import boto3
 import datetime
 import re
 from app.models.queues.route import create_queue
