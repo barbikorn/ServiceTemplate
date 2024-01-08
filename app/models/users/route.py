@@ -1,7 +1,7 @@
 
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request, Header, Query
+from fastapi import APIRouter, HTTPException, Request, Header, Query ,BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
 from app.models.users.user import User,UserGet,UserCreate,UserUpdate
@@ -9,6 +9,7 @@ from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
 # from lib.convert_request import request_to_dict
 from lib.middleware.queueLog import log_request_and_upload_to_queue
+
 
 
 router = APIRouter()
@@ -55,33 +56,36 @@ from bson import ObjectId
 async def create_user(
     request: Request,
     user_data: UserCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     user_data_dict = user_data.dict()
     result = collection.insert_one(user_data_dict)
-
 
     if result.acknowledged :
 
         created_user = collection.find_one({"_id": ObjectId(result.inserted_id)})
         created_user['id'] = str(created_user['_id'])  # Add 'id' key and convert ObjectId to string
-        response = await log_request_and_upload_to_queue(request,collection_name,created_user,htoken)
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_user, htoken, background_tasks
+        )
         return UserGet(**created_user)
     else:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
 
 @router.get("/", response_model=List[Dict[str, Any]])
-def get_all_users(
+async def get_all_users(
     request: Request,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
     users = []
     for user in collection.find():
         user_id = str(user.pop('_id'))
@@ -133,8 +137,6 @@ def update_user(
 ):
     host = htoken
     collection = database_manager.get_collection(host)
-    print(user_id)
-    print(user_data)
     result = collection.update_one({"_id": ObjectId(user_id)}, {"$set": user_data.dict()})
     #CAN use this timestamp
     print(result.raw_result)
@@ -146,13 +148,13 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
 @router.delete("/{user_id}")
-def delete_user(
+async def delete_user(
     request: Request,
     user_id: str,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     result = collection.delete_one({"_id": user_id})
     if result.deleted_count == 1:

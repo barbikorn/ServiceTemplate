@@ -46,7 +46,7 @@ class HostDatabaseManager:
             return host_entry["uri"]
         return self.atlas_uri  # Use the default atlas_uri
 
-    def get_collection(self, host: str):
+    async def get_collection(self, host: str):
         database_name = self.get_database_name(host)
         if database_name:
             return get_database_atlas(database_name, self.atlas_uri)[self.collection_name]

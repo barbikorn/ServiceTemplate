@@ -285,7 +285,7 @@ from fastapi.openapi.models import OAuthFlowAuthorizationCode
 from lib.middleware.LINE import fetch_line_user_info
 
 
-app = FastAPI()
+# app = FastAPI()
 
 # Define your OAuth2 flow for LINE Login
 line_oauth2_scheme = OAuth2AuthorizationCodeBearer(

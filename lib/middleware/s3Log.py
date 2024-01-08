@@ -30,15 +30,16 @@ def upload_to_s3(bucket_name, object_key, data):
 
     s3.put_object(Bucket=bucket_name, Key=object_key, Body=data_bytes,ACL='public-read')
 
+
 ## WORK FOR NORMAL FUNC
-async def log_request_and_upload_to_s3(request: Request, collection_name: str):
+def log_request_and_upload_to_s3(request: Request, collection_name: str):
     my_s3_bucket = 'log-server'
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     log_name = f"logs/log-entry-{timestamp}.json"
 
     # Decode the bytes data to a string
-    request_body = await request.body()
+    request_body = request.body()
     request_body_str = request_body.decode('utf-8')
 
     log_info = {

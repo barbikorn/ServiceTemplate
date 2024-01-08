@@ -10,8 +10,8 @@ class QueueManager:
         self.atlas_uri = "mongodb+srv://doadmin:Z79MQ4mxi5X0281G@academy-client-a3614ad3.mongo.ondigitalocean.com/admin?tls=true&authSource=admin"
         self.queue_collection = get_database_atlas("hosts", self.host_uri)["queues"]
 
-    async def add_queue(self,data:Dict[str, Any]):
-        result = await self.queue_collection.insert_one(data)
+    def add_queue(self,data:Dict[str, Any]):
+        result = self.queue_collection.insert_one(data)
         print("add to queue succsess")
         return True
     
