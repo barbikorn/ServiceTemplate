@@ -1,12 +1,13 @@
 import json
 import os
-from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, Query
+from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.userReports.userReport import UserReport,UserReportGet,UserReportCreate
+from app.models.userReports.userReport import UserReport,UserReportGet,UserReportCreate,UserReportUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
 from pymongo.collection import Collection
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -15,20 +16,27 @@ database_manager = HostDatabaseManager(collection_name)
 
 
 @router.post("/", response_model=UserReportGet)
-def create_userReport(
+async def create_userReport(
     request: Request,
     userReport_data: UserReportCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     userReport_data_dict = userReport_data.dict()
     result = collection.insert_one(userReport_data_dict)
 
     if result.acknowledged:
-        created_userReport = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_userReport['id'] = str(created_userReport['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_userReport = userReport_data_dict  # Start with the userReport data provided
+        created_userReport['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_userReport, htoken, background_tasks
+        )
         return UserReportGet(**created_userReport)
     else:
         raise HTTPException(status_code=500, detail="Failed to create userReport")
@@ -81,22 +89,30 @@ async def get_userReport_by_filter(
         userReports.append(UserReport(id=str(userReport["_id"]), **userReport))
     return userReports
 
-@router.put("/{userReport_id}", response_model=UserReport)
-def update_userReport(
+@router.put("/{userReport_id}", response_model=UserReportGet)
+async def update_userReport(
     request: Request,
     userReport_id: str,
-    userReport_data,
+    userReport_data: UserReportUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(userReport_id)}, {"$set": userReport_data.dict()})
 
-    result = collection.update_one({"_id": userReport_id}, {"$set": userReport_data.dict()})
     if result.modified_count == 1:
-        updated_userReport = collection.find_one({"_id": userReport_id})
-        return UserReport(**updated_userReport)
+        updated_userReport = collection.find_one({"_id": ObjectId(userReport_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_userReport, htoken
+        )
+
+        return UserReportGet(**updated_userReport)
     else:
-        raise HTTPException(status_code=404, detail="UserReport not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{userReport_id}")
 def delete_userReport(

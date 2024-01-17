@@ -1,13 +1,14 @@
 
 import json
 import os
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Header, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Header, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.mcourses.mcourse import Mcourse,McourseGet,McourseCreate
+from app.models.mcourses.mcourse import Mcourse,McourseGet,McourseCreate,McourseUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
 from pymongo.collection import Collection
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -17,20 +18,27 @@ app = FastAPI()
 
 # CRUD
 @router.post("/", response_model=McourseGet)
-def create_mcourse(
+async def create_mcourse(
     request: Request,
     mcourse_data: McourseCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     mcourse_data_dict = mcourse_data.dict()
     result = collection.insert_one(mcourse_data_dict)
 
     if result.acknowledged:
-        created_mcourse = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_mcourse['id'] = str(created_mcourse['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_mcourse = mcourse_data_dict  # Start with the mcourse data provided
+        created_mcourse['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_mcourse, htoken, background_tasks
+        )
         return McourseGet(**created_mcourse)
     else:
         raise HTTPException(status_code=500, detail="Failed to create mcourse")
@@ -83,22 +91,30 @@ async def get_mcourse_by_filter(
         mcourses.append(Mcourse(id=str(mcourse["_id"]), **mcourse))
     return mcourses
 
-@router.put("/{mcourse_id}", response_model=Mcourse)
-def update_mcourse(
+@router.put("/{mcourse_id}", response_model=McourseGet)
+async def update_mcourse(
     request: Request,
     mcourse_id: str,
-    mcourse_data,
+    mcourse_data: McourseUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(mcourse_id)}, {"$set": mcourse_data.dict()})
 
-    result = collection.update_one({"_id": mcourse_id}, {"$set": mcourse_data.dict()})
     if result.modified_count == 1:
-        updated_mcourse = collection.find_one({"_id": mcourse_id})
-        return Mcourse(**updated_mcourse)
+        updated_mcourse = collection.find_one({"_id": ObjectId(mcourse_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_mcourse, htoken
+        )
+
+        return McourseGet(**updated_mcourse)
     else:
-        raise HTTPException(status_code=404, detail="Mcourse not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{mcourse_id}")
 def delete_mcourse(

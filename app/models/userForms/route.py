@@ -1,12 +1,13 @@
 import json
 import os
-from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, Query
+from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.userForms.userForm import UserForm,UserFormGet,UserFormCreate
+from app.models.userForms.userForm import UserForm,UserFormGet,UserFormCreate,UserFormUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
 from pymongo.collection import Collection
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -15,20 +16,27 @@ database_manager = HostDatabaseManager(collection_name)
 
 
 @router.post("/", response_model=UserFormGet)
-def create_userForm(
+async def create_userForm(
     request: Request,
     userForm_data: UserFormCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     userForm_data_dict = userForm_data.dict()
     result = collection.insert_one(userForm_data_dict)
 
     if result.acknowledged:
-        created_userForm = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_userForm['id'] = str(created_userForm['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_userForm = userForm_data_dict  # Start with the userForm data provided
+        created_userForm['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_userForm, htoken, background_tasks
+        )
         return UserFormGet(**created_userForm)
     else:
         raise HTTPException(status_code=500, detail="Failed to create userForm")
@@ -81,22 +89,30 @@ async def get_userForm_by_filter(
         userForms.append(UserForm(id=str(userForm["_id"]), **userForm))
     return userForms
 
-@router.put("/{userForm_id}", response_model=UserForm)
-def update_userForm(
+@router.put("/{userForm_id}", response_model=UserFormGet)
+async def update_userForm(
     request: Request,
     userForm_id: str,
-    userForm_data,
+    userForm_data: UserFormUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(userForm_id)}, {"$set": userForm_data.dict()})
 
-    result = collection.update_one({"_id": userForm_id}, {"$set": userForm_data.dict()})
     if result.modified_count == 1:
-        updated_userForm = collection.find_one({"_id": userForm_id})
-        return UserForm(**updated_userForm)
+        updated_userForm = collection.find_one({"_id": ObjectId(userForm_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_userForm, htoken
+        )
+
+        return UserFormGet(**updated_userForm)
     else:
-        raise HTTPException(status_code=404, detail="UserForm not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{userForm_id}")
 def delete_userForm(

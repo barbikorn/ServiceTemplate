@@ -1,12 +1,13 @@
 import json
 import os
-from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, Query
+from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.types.type import Type,TypeGet,TypeCreate
+from app.models.types.type import Type,TypeGet,TypeCreate, TypeUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
 from pymongo.collection import Collection
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -15,23 +16,31 @@ database_manager = HostDatabaseManager(collection_name)
 
 
 @router.post("/", response_model=TypeGet)
-def create_type(
+async def create_type(
     request: Request,
     type_data: TypeCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     type_data_dict = type_data.dict()
     result = collection.insert_one(type_data_dict)
 
     if result.acknowledged:
-        created_type = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_type['id'] = str(created_type['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_type = type_data_dict  # Start with the type data provided
+        created_type['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_type, htoken, background_tasks
+        )
         return TypeGet(**created_type)
     else:
         raise HTTPException(status_code=500, detail="Failed to create type")
+    
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_types(
     htoken: Optional[str] = Header(None)
@@ -80,22 +89,30 @@ async def get_type_by_filter(
         types.append(Type(id=str(type["_id"]), **type))
     return types
 
-@router.put("/{type_id}", response_model=Type)
-def update_type(
+@router.put("/{type_id}", response_model=TypeGet)
+async def update_type(
     request: Request,
     type_id: str,
-    type_data,
+    type_data: TypeUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(type_id)}, {"$set": type_data.dict()})
 
-    result = collection.update_one({"_id": type_id}, {"$set": type_data.dict()})
     if result.modified_count == 1:
-        updated_type = collection.find_one({"_id": type_id})
-        return Type(**updated_type)
+        updated_type = collection.find_one({"_id": ObjectId(type_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_type, htoken
+        )
+
+        return TypeGet(**updated_type)
     else:
-        raise HTTPException(status_code=404, detail="Type not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{type_id}")
 def delete_type(

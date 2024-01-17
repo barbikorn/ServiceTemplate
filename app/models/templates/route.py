@@ -1,12 +1,13 @@
 import json
 import os
-from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, Query
+from fastapi import FastAPI,APIRouter, HTTPException, Request, Header, Query,BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.templates.template import Template,TemplateGet,TemplateCreate
+from app.models.templates.template import Template,TemplateGet,TemplateCreate,TemplateUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
 from pymongo.collection import Collection
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -15,20 +16,27 @@ database_manager = HostDatabaseManager(collection_name)
 
 
 @router.post("/", response_model=TemplateGet)
-def create_template(
+async def create_template(
     request: Request,
     template_data: TemplateCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     template_data_dict = template_data.dict()
     result = collection.insert_one(template_data_dict)
 
     if result.acknowledged:
-        created_template = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_template['id'] = str(created_template['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_template = template_data_dict  # Start with the template data provided
+        created_template['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_template, htoken, background_tasks
+        )
         return TemplateGet(**created_template)
     else:
         raise HTTPException(status_code=500, detail="Failed to create template")
@@ -81,22 +89,30 @@ async def get_template_by_filter(
         templates.append(Template(id=str(template["_id"]), **template))
     return templates
 
-@router.put("/{template_id}", response_model=Template)
-def update_template(
+@router.put("/{template_id}", response_model=TemplateGet)
+async def update_template(
     request: Request,
     template_id: str,
-    template_data,
+    template_data: TemplateUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(template_id)}, {"$set": template_data.dict()})
 
-    result = collection.update_one({"_id": template_id}, {"$set": template_data.dict()})
     if result.modified_count == 1:
-        updated_template = collection.find_one({"_id": template_id})
-        return Template(**updated_template)
+        updated_template = collection.find_one({"_id": ObjectId(template_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_template, htoken
+        )
+
+        return TemplateGet(**updated_template)
     else:
-        raise HTTPException(status_code=404, detail="Template not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{template_id}")
 def delete_template(

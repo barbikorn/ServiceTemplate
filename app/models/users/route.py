@@ -66,13 +66,13 @@ async def create_user(
     user_data_dict = user_data.dict()
     result = collection.insert_one(user_data_dict)
 
-    if result.acknowledged :
+    if result.acknowledged:
 
-        created_user = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_user['id'] = str(created_user['_id'])  # Add 'id' key and convert ObjectId to string
+        created_user = user_data_dict  # Start with the user data provided
+        created_user['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
         background_tasks.add_task(
             log_request_and_upload_to_queue,
-            request, collection_name, created_user, htoken, background_tasks
+            request, collection_name, created_user, htoken
         )
         return UserGet(**created_user)
     else:
@@ -129,23 +129,29 @@ async def get_user_by_filter(
     return users
 
 @router.put("/{user_id}", response_model=UserGet)
-def update_user(
+async def update_user(
     request: Request,
     user_id: str,
-    user_data : UserUpdate ,
+    user_data: UserUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
     result = collection.update_one({"_id": ObjectId(user_id)}, {"$set": user_data.dict()})
-    #CAN use this timestamp
-    print(result.raw_result)
-    print(result.modified_count)
+
     if result.modified_count == 1:
         updated_user = collection.find_one({"_id": ObjectId(user_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_user, htoken
+        )
+
         return UserGet(**updated_user)
     else:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{user_id}")
 async def delete_user(

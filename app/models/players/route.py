@@ -1,12 +1,13 @@
 
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request, Header, Query
+from fastapi import APIRouter, HTTPException, Request, Header, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.players.player import Player,PlayerGet,PlayerCreate
+from app.models.players.player import Player,PlayerGet,PlayerCreate,PlayerUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -17,23 +18,31 @@ database_manager = HostDatabaseManager(collection_name)
 # Assuming you have a database_manager instance
 
 @router.post("/", response_model=PlayerGet)
-def create_player(
+async def create_player(
     request: Request,
     player_data: PlayerCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     player_data_dict = player_data.dict()
     result = collection.insert_one(player_data_dict)
 
     if result.acknowledged:
-        created_player = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_player['id'] = str(created_player['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_player = player_data_dict  # Start with the player data provided
+        created_player['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_player, htoken, background_tasks
+        )
         return PlayerGet(**created_player)
     else:
         raise HTTPException(status_code=500, detail="Failed to create player")
+
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_players(
@@ -83,22 +92,30 @@ async def get_player_by_filter(
         players.append(Player(id=str(player["_id"]), **player))
     return players
 
-@router.put("/{player_id}", response_model=Player)
-def update_player(
+@router.put("/{player_id}", response_model=PlayerGet)
+async def update_player(
     request: Request,
     player_id: str,
-    player_data,
+    player_data: PlayerUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(player_id)}, {"$set": player_data.dict()})
 
-    result = collection.update_one({"_id": player_id}, {"$set": player_data.dict()})
     if result.modified_count == 1:
-        updated_player = collection.find_one({"_id": player_id})
-        return Player(**updated_player)
+        updated_player = collection.find_one({"_id": ObjectId(player_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_player, htoken
+        )
+
+        return PlayerGet(**updated_player)
     else:
-        raise HTTPException(status_code=404, detail="Player not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{player_id}")
 def delete_player(

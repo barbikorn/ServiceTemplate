@@ -1,12 +1,13 @@
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request, Header, Query
+from fastapi import APIRouter, HTTPException, Request, Header, BackgroundTasks
 from pymongo.collection import Collection
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.enrolls.enroll import Enroll,EnrollGet,EnrollCreate
+from app.models.enrolls.enroll import Enroll,EnrollGet,EnrollCreate,EnrollUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -16,25 +17,32 @@ database_manager = HostDatabaseManager(collection_name)
 # Assuming you have a database_manager instance
 
 
-
 @router.post("/", response_model=EnrollGet)
-def create_enroll(
+async def create_enroll(
     request: Request,
     enroll_data: EnrollCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     enroll_data_dict = enroll_data.dict()
     result = collection.insert_one(enroll_data_dict)
 
     if result.acknowledged:
-        created_enroll = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_enroll['id'] = str(created_enroll['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_enroll = enroll_data_dict  # Start with the enroll data provided
+        created_enroll['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_enroll, htoken, background_tasks
+        )
         return EnrollGet(**created_enroll)
     else:
         raise HTTPException(status_code=500, detail="Failed to create enroll")
+
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_enrolls(
@@ -84,22 +92,30 @@ async def get_enroll_by_filter(
         enrolls.append(Enroll(id=str(enroll["_id"]), **enroll))
     return enrolls
 
-@router.put("/{enroll_id}", response_model=Enroll)
-def update_enroll(
+@router.put("/{enroll_id}", response_model=EnrollGet)
+async def update_enroll(
     request: Request,
     enroll_id: str,
-    enroll_data,
+    enroll_data: EnrollUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(enroll_id)}, {"$set": enroll_data.dict()})
 
-    result = collection.update_one({"_id": enroll_id}, {"$set": enroll_data.dict()})
     if result.modified_count == 1:
-        updated_enroll = collection.find_one({"_id": enroll_id})
-        return Enroll(**updated_enroll)
+        updated_enroll = collection.find_one({"_id": ObjectId(enroll_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_enroll, htoken
+        )
+
+        return EnrollGet(**updated_enroll)
     else:
-        raise HTTPException(status_code=404, detail="Enroll not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{enroll_id}")
 def delete_enroll(

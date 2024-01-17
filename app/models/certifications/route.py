@@ -1,11 +1,12 @@
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request, Header, Query
+from fastapi import APIRouter, HTTPException, Request, Header, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
 from app.models.certifications.certification import Certification,CertificationGet,CertificationCreate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -14,23 +15,31 @@ database_manager = HostDatabaseManager(collection_name)
 
 
 @router.post("/", response_model=CertificationGet)
-def create_certification(
+async def create_certification(
     request: Request,
     certification_data: CertificationCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
     certification_data_dict = certification_data.dict()
     result = collection.insert_one(certification_data_dict)
 
     if result.acknowledged:
-        created_certification = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_certification['id'] = str(created_certification['_id'])  # Add 'id' key and convert ObjectId to string
+
+        created_certification = certification_data_dict  # Start with the certification data provided
+        created_certification['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_certification, htoken, background_tasks
+        )
         return CertificationGet(**created_certification)
     else:
         raise HTTPException(status_code=500, detail="Failed to create certification")
+
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_certifications(

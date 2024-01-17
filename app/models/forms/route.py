@@ -1,12 +1,13 @@
 import json
 import os
-from fastapi import APIRouter, HTTPException, Request, Header, Query
+from fastapi import APIRouter, HTTPException, Request, Header, BackgroundTasks
 from pymongo.collection import Collection
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
-from app.models.forms.form import Form,FormGet,FormCreate
+from app.models.forms.form import Form,FormGet,FormCreate,FormUpdate
 from app.database import get_database_atlas
 from lib.host_manager import HostDatabaseManager
+from lib.middleware.queueLog import log_request_and_upload_to_queue
 
 router = APIRouter()
 
@@ -16,25 +17,32 @@ database_manager = HostDatabaseManager(collection_name)
 # Assuming you have a database_manager instance
 
 
-
 @router.post("/", response_model=FormGet)
-def create_user(
+async def create_form(
     request: Request,
-    user_data: FormCreate,
+    form_data: FormCreate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
+    
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
 
-    user_data_dict = user_data.dict()
-    result = collection.insert_one(user_data_dict)
+    form_data_dict = form_data.dict()
+    result = collection.insert_one(form_data_dict)
 
     if result.acknowledged:
-        created_user = collection.find_one({"_id": ObjectId(result.inserted_id)})
-        created_user['id'] = str(created_user['_id'])  # Add 'id' key and convert ObjectId to string
-        return FormGet(**created_user)
+
+        created_form = form_data_dict  # Start with the form data provided
+        created_form['id'] = str(result.inserted_id)  # Add 'id' key and convert ObjectId to string
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, created_form, htoken, background_tasks
+        )
+        return FormGet(**created_form)
     else:
-        raise HTTPException(status_code=500, detail="Failed to create user")
+        raise HTTPException(status_code=500, detail="Failed to create form")
+
 
 @router.get("/", response_model=List[Dict[str, Any]])
 def get_all_forms(
@@ -83,23 +91,30 @@ async def get_form_by_filter(
     async for form in cursor:
         forms.append(Form(id=str(form["_id"]), **form))
     return forms
-
-@router.put("/{form_id}", response_model=Form)
-def update_form(
+@router.put("/{form_id}", response_model=FormGet)
+async def update_form(
     request: Request,
     form_id: str,
-    form_data,
+    form_data: FormUpdate,
+    background_tasks: BackgroundTasks,
     htoken: Optional[str] = Header(None)
 ):
     host = htoken
-    collection = database_manager.get_collection(host)
+    collection = await database_manager.get_collection(host)
+    result = collection.update_one({"_id": ObjectId(form_id)}, {"$set": form_data.dict()})
 
-    result = collection.update_one({"_id": form_id}, {"$set": form_data.dict()})
     if result.modified_count == 1:
-        updated_form = collection.find_one({"_id": form_id})
-        return Form(**updated_form)
+        updated_form = collection.find_one({"_id": ObjectId(form_id)})
+
+        # Use background task to log the update
+        background_tasks.add_task(
+            log_request_and_upload_to_queue,
+            request, collection_name, updated_form, htoken
+        )
+
+        return FormGet(**updated_form)
     else:
-        raise HTTPException(status_code=404, detail="Form not found")
+        raise HTTPException(status_code=404, detail="Nothing change")
 
 @router.delete("/{form_id}")
 def delete_form(
